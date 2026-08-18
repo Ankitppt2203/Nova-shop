@@ -54,7 +54,7 @@ interface CartContextValue {
   dismissToast: () => void;
 }
 
-const API_BASE_URL = "http://localhost:5000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ?? "";
 const WISHLIST_STORAGE_KEY = "nova-shop-wishlist";
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -63,13 +63,23 @@ async function requestJson<T>(
   path: string,
   init: RequestInit = {}
 ): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init.headers ?? {}),
-    },
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(init.headers ?? {}),
+      },
+    });
+  } catch (error) {
+    throw new Error(
+      error instanceof Error && error.message
+        ? "Cart service is unavailable right now. Please make sure the backend server is running and try again."
+        : "Unable to reach the cart service right now. Please try again in a moment."
+    );
+  }
 
   let data: unknown = null;
   try {
@@ -85,9 +95,13 @@ async function requestJson<T>(
       "message" in data &&
       typeof (data as { message?: unknown }).message === "string"
         ? (data as { message: string }).message
-        : `Request failed with status ${response.status}`;
+        : "";
 
-    throw new Error(message);
+    throw new Error(
+      message
+        ? `Request failed with status ${response.status}: ${message}`
+        : `Request failed with status ${response.status}`
+    );
   }
 
   return data as T;

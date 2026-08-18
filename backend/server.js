@@ -10,6 +10,17 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.use("/api/cart", (req, res, next) => {
+  if (mongoose.connection.readyState === 1) {
+    return next();
+  }
+
+  res.status(500).json({
+    message:
+      "Cart service is temporarily unavailable while the database is connecting. Please try again in a moment.",
+  });
+});
+
 app.use("/api/cart", cartRoutes);
 
 app.get("/", (req, res) => {
@@ -18,18 +29,22 @@ app.get("/", (req, res) => {
   });
 });
 
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log("MongoDB connected successfully");
+const PORT = process.env.PORT || 5000;
 
-    app.listen(process.env.PORT || 5000, "0.0.0.0", () => {
-      console.log(
-        `Server running on port ${process.env.PORT || 5000}`
-      );
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
+if (!process.env.MONGO_URI) {
+  console.warn("MONGO_URI is not set. Cart requests will fail until it is configured.");
+} else {
+  mongoose
+    .connect(process.env.MONGO_URI)
+    .then(() => {
+      console.log("MongoDB connected successfully");
+    })
+    .catch((error) => {
+      console.error("MongoDB connection failed:");
+      console.error(error.message);
     });
-  })
-  .catch((error) => {
-    console.error("MongoDB connection failed:");
-    console.error(error.message);
-  });
+}
