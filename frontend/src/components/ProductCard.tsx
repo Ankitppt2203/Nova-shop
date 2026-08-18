@@ -10,8 +10,12 @@ export default function ProductCard({ product }: { product: Product }) {
   const [added, setAdded] = useState(false);
   const saved = isInWishlist(product.id);
 
-  const handleAdd = () => {
-    addToCart(product);
+  const handleAdd = async () => {
+    const success = await addToCart(product);
+    if (!success) {
+      return;
+    }
+
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1400);
   };
@@ -81,17 +85,17 @@ export default function ProductCard({ product }: { product: Product }) {
           )}
         </div>
 
-        <div className="mt-auto grid grid-cols-2 gap-2 pt-5">
+        <div className="mt-auto grid grid-cols-1 gap-2 pt-5 sm:grid-cols-2">
           <Link
             to={`/products/${product.id}`}
-            className="flex items-center justify-center rounded-xl border border-line px-3 py-2.5 text-sm font-medium text-ink transition-colors hover:border-ink hover:bg-ink/5"
+            className="flex h-11 w-full items-center justify-center rounded-xl border border-line px-3 text-sm font-medium text-ink transition-colors hover:border-ink hover:bg-ink/5 sm:h-12"
           >
-            View Details
+            Buy Now
           </Link>
           <button
             type="button"
             onClick={handleAdd}
-            className="flex items-center justify-center gap-1.5 rounded-xl bg-ink px-3 py-2.5 text-sm font-medium text-cream transition-all hover:bg-black active:scale-[0.98]"
+            className="flex h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-ink px-3 text-sm font-medium text-cream transition-all hover:bg-black active:scale-[0.98] sm:h-12"
           >
             {added ? <Check size={15} /> : <Plus size={15} />}
             {added ? "Added" : "Add to Cart"}

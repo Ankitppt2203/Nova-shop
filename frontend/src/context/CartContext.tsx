@@ -8,9 +8,10 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { Product } from "../lib/products";
+import { getProduct, type Product } from "../lib/products";
 
 interface CartItem {
+  id: string;
   product: Product;
   quantity: number;
 }
@@ -24,6 +25,15 @@ interface ToastState {
   message: string;
 }
 
+interface ServerCartItem {
+  _id: string;
+  productId: string;
+  name: string;
+  price: number;
+  image: string;
+  quantity: number;
+}
+
 interface CartContextValue {
   items: CartItem[];
   wishlistItems: WishlistItem[];
@@ -31,63 +41,123 @@ interface CartContextValue {
   wishlistCount: number;
   subtotal: number;
   toast: ToastState | null;
-  addToCart: (product: Product, quantity?: number) => void;
-  removeFromCart: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
-  clearCart: () => void;
+  loading: boolean;
+  error: string | null;
+  refreshCart: () => Promise<void>;
+  addToCart: (product: Product, quantity?: number) => Promise<boolean>;
+  removeFromCart: (cartItemId: string) => Promise<boolean>;
+  updateQuantity: (cartItemId: string, quantity: number) => Promise<boolean>;
+  clearCart: () => Promise<boolean>;
   toggleWishlist: (product: Product) => void;
   removeFromWishlist: (productId: string) => void;
   isInWishlist: (productId: string) => boolean;
   dismissToast: () => void;
 }
 
-const STORAGE_KEY = "nova-shop-cart";
+const API_BASE_URL = "http://localhost:5000";
 const WISHLIST_STORAGE_KEY = "nova-shop-wishlist";
 
 const CartContext = createContext<CartContextValue | null>(null);
 
-function loadCart(): CartItem[] {
+async function requestJson<T>(
+  path: string,
+  init: RequestInit = {}
+): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init.headers ?? {}),
+    },
+  });
+
+  let data: unknown = null;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as CartItem[];
-    return Array.isArray(parsed) ? parsed : [];
+    data = await response.json();
   } catch {
-    return [];
+    data = null;
   }
+
+  if (!response.ok) {
+    const message =
+      typeof data === "object" &&
+      data !== null &&
+      "message" in data &&
+      typeof (data as { message?: unknown }).message === "string"
+        ? (data as { message: string }).message
+        : `Request failed with status ${response.status}`;
+
+    throw new Error(message);
+  }
+
+  return data as T;
 }
 
-function loadWishlist(): WishlistItem[] {
-  try {
-    const raw = localStorage.getItem(WISHLIST_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as WishlistItem[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
+function mapServerCartItem(item: ServerCartItem): CartItem {
+  const product = getProduct(item.productId);
+
+  if (product) {
+    return {
+      id: item._id,
+      product,
+      quantity: item.quantity,
+    };
   }
+
+  return {
+    id: item._id,
+    product: {
+      id: item.productId,
+      name: item.name,
+      category: "Home & Living",
+      price: item.price,
+      description: "",
+      image: item.image,
+      rating: 0,
+      reviews: 0,
+    } as Product,
+    quantity: item.quantity,
+  };
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>(loadCart);
-  const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>(
-    loadWishlist
-  );
-  const [toast, setToast] = useState<ToastState | null>(null);
-
-  useEffect(() => {
+  const [items, setItems] = useState<CartItem[]>([]);
+  const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+      const raw = localStorage.getItem(WISHLIST_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw) as WishlistItem[];
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
-      // Storage unavailable — cart still works in memory.
+      return [];
     }
-  }, [items]);
+  });
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const refreshCart = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const cart = await requestJson<ServerCartItem[]>("/api/cart");
+      setItems(cart.map(mapServerCartItem));
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to load cart";
+      setError(message);
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     try {
       localStorage.setItem(WISHLIST_STORAGE_KEY, JSON.stringify(wishlistItems));
     } catch {
-      // Storage unavailable — wishlist still works in memory.
+      // Storage unavailable â€” wishlist still works in memory.
     }
   }, [wishlistItems]);
 
@@ -97,36 +167,144 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [toast]);
 
-  const addToCart = useCallback((product: Product, quantity = 1) => {
+  useEffect(() => {
+    void refreshCart();
+  }, [refreshCart]);
+
+  const syncCartItem = useCallback((serverItem: ServerCartItem) => {
+    const mappedItem = mapServerCartItem(serverItem);
+
     setItems((prev) => {
-      const existing = prev.find((item) => item.product.id === product.id);
-      if (existing) {
-        return prev.map((item) =>
-          item.product.id === product.id
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
-        );
+      const index = prev.findIndex(
+        (item) =>
+          item.id === mappedItem.id || item.product.id === mappedItem.product.id
+      );
+
+      if (index === -1) {
+        return [...prev, mappedItem];
       }
-      return [...prev, { product, quantity }];
+
+      const next = [...prev];
+      next[index] = mappedItem;
+      return next;
     });
-    setToast({ id: Date.now(), message: `${product.name} added to cart` });
   }, []);
 
-  const removeFromCart = useCallback((productId: string) => {
-    setItems((prev) => prev.filter((item) => item.product.id !== productId));
-  }, []);
+  const addToCart = useCallback(
+    async (product: Product, quantity = 1) => {
+      const normalizedQuantity = Math.max(1, Math.floor(quantity));
 
-  const updateQuantity = useCallback((productId: string, quantity: number) => {
-    setItems((prev) =>
-      quantity <= 0
-        ? prev.filter((item) => item.product.id !== productId)
-        : prev.map((item) =>
-            item.product.id === productId ? { ...item, quantity } : item
-          )
-    );
-  }, []);
+      try {
+        const serverItem = await requestJson<ServerCartItem>("/api/cart", {
+          method: "POST",
+          body: JSON.stringify({
+            productId: product.id,
+            name: product.name,
+            price: product.price,
+            image: product.image,
+            quantity: normalizedQuantity,
+          }),
+        });
 
-  const clearCart = useCallback(() => setItems([]), []);
+        syncCartItem(serverItem);
+        setError(null);
+        setToast({ id: Date.now(), message: `${product.name} added to cart` });
+        return true;
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Unable to add item to cart";
+        setError(message);
+        setToast({ id: Date.now(), message });
+        return false;
+      }
+    },
+    [syncCartItem]
+  );
+
+  const removeFromCart = useCallback(
+    async (cartItemId: string) => {
+      try {
+        await requestJson<{ message: string }>(`/api/cart/${cartItemId}`, {
+          method: "DELETE",
+        });
+        setItems((prev) => prev.filter((item) => item.id !== cartItemId));
+        setError(null);
+        return true;
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Unable to remove item";
+        setError(message);
+        setToast({ id: Date.now(), message });
+        return false;
+      }
+    },
+    []
+  );
+
+  const updateQuantity = useCallback(
+    async (cartItemId: string, quantity: number) => {
+      const normalizedQuantity = Math.max(1, Math.floor(quantity));
+
+      try {
+        const serverItem = await requestJson<ServerCartItem>(
+          `/api/cart/${cartItemId}`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({ quantity: normalizedQuantity }),
+          }
+        );
+
+        syncCartItem(serverItem);
+        setError(null);
+        return true;
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Unable to update quantity";
+        setError(message);
+        setToast({ id: Date.now(), message });
+        return false;
+      }
+    },
+    [syncCartItem]
+  );
+
+  const clearCart = useCallback(async () => {
+    const currentItems = [...items];
+
+    try {
+      const results = await Promise.allSettled(
+        currentItems.map((item) =>
+          requestJson<{ message: string }>(`/api/cart/${item.id}`, {
+            method: "DELETE",
+          })
+        )
+      );
+
+      const failedResult = results.find((result) => result.status === "rejected");
+      if (failedResult) {
+        await refreshCart();
+        const reason =
+          failedResult.status === "rejected" && failedResult.reason instanceof Error
+            ? failedResult.reason.message
+            : "Unable to clear cart";
+        setError(reason);
+        setToast({ id: Date.now(), message: reason });
+        return false;
+      }
+
+      setItems([]);
+      setError(null);
+      return true;
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Unable to clear cart";
+      setError(message);
+      setToast({ id: Date.now(), message });
+      await refreshCart();
+      return false;
+    }
+  }, [items, refreshCart]);
+
   const dismissToast = useCallback(() => setToast(null), []);
   const toggleWishlist = useCallback((product: Product) => {
     setWishlistItems((prev) => {
@@ -145,7 +323,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const removeFromWishlist = useCallback((productId: string) => {
-    setWishlistItems((prev) => prev.filter((item) => item.product.id !== productId));
+    setWishlistItems((prev) =>
+      prev.filter((item) => item.product.id !== productId)
+    );
   }, []);
 
   const isInWishlist = useCallback(
@@ -174,6 +354,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
         wishlistCount,
         subtotal,
         toast,
+        loading,
+        error,
+        refreshCart,
         addToCart,
         removeFromCart,
         updateQuantity,

@@ -2,10 +2,13 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
+  Loader2,
   CheckCircle2,
+  TicketPercent,
   Lock,
   ShoppingBag,
   Trash2,
+  X,
 } from "lucide-react";
 import {
   FREE_SHIPPING_THRESHOLD,
@@ -15,19 +18,77 @@ import {
 import { useCart } from "../context/CartContext";
 import QuantitySelector from "../components/QuantitySelector";
 
-export default function CartPage() {
-  const { items, count, subtotal, updateQuantity, removeFromCart, clearCart } =
-    useCart();
-  const [orderPlaced, setOrderPlaced] = useState(false);
+const COUPONS = {
+  SAVE10: { label: "10% off your subtotal", type: "percent", value: 10 },
+  SAVE200: { label: "₹200 off your subtotal", type: "fixed", value: 200 },
+  FREESHIP: { label: "Free shipping", type: "shipping", value: 0 },
+} as const;
 
-  const shipping =
+type CouponCode = keyof typeof COUPONS;
+
+export default function CartPage() {
+  const {
+    items,
+    count,
+    subtotal,
+    updateQuantity,
+    removeFromCart,
+    clearCart,
+    loading,
+    error,
+    refreshCart,
+  } = useCart();
+  const [orderPlaced, setOrderPlaced] = useState(false);
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<CouponCode | null>(null);
+  const [couponMessage, setCouponMessage] = useState("");
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+
+  const baseShipping =
     subtotal === 0 || subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_COST;
-  const total = subtotal + shipping;
+  const coupon = appliedCoupon ? COUPONS[appliedCoupon] : null;
+  const discount =
+    coupon?.type === "percent"
+      ? Math.min(subtotal, Math.round((subtotal * coupon.value) / 100))
+      : coupon?.type === "fixed"
+        ? Math.min(subtotal, coupon.value)
+        : 0;
+  const shipping = coupon?.type === "shipping" ? 0 : baseShipping;
+  const total = Math.max(0, subtotal - discount + shipping);
   const remaining = FREE_SHIPPING_THRESHOLD - subtotal;
 
-  const handleCheckout = () => {
+  const handleApplyCoupon = () => {
+    const code = couponInput.trim().toUpperCase() as CouponCode;
+    if (code in COUPONS) {
+      setAppliedCoupon(code);
+      setCouponMessage(`${code} applied successfully.`);
+    } else {
+      setAppliedCoupon(null);
+      setCouponMessage("That coupon code is not valid.");
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponMessage("");
+  };
+
+  const handleCheckout = async () => {
+    if (isCheckingOut) {
+      return;
+    }
+
+    setIsCheckingOut(true);
+    const success = await clearCart();
+    setIsCheckingOut(false);
+
+    if (!success) {
+      return;
+    }
+
     setOrderPlaced(true);
-    clearCart();
+    removeCoupon();
     window.scrollTo(0, 0);
   };
 
@@ -51,6 +112,45 @@ export default function CartPage() {
           Continue Shopping
           <ArrowRight size={15} />
         </Link>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 py-24 text-center sm:px-6 lg:px-8">
+        <span className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-line bg-cream">
+          <Loader2 size={28} className="animate-spin text-clay" />
+        </span>
+        <h1 className="mt-6 font-display text-3xl font-semibold sm:text-4xl">
+          Loading your cart
+        </h1>
+        <p className="mx-auto mt-3 max-w-sm leading-relaxed text-clay">
+          We are syncing your cart with the server.
+        </p>
+      </div>
+    );
+  }
+
+  if (error && items.length === 0) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 py-24 text-center sm:px-6 lg:px-8">
+        <span className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-line bg-cream">
+          <ShoppingBag size={28} className="text-clay" />
+        </span>
+        <h1 className="mt-6 font-display text-3xl font-semibold sm:text-4xl">
+          We could not load your cart
+        </h1>
+        <p className="mx-auto mt-3 max-w-sm leading-relaxed text-clay">
+          {error}
+        </p>
+        <button
+          type="button"
+          onClick={() => void refreshCart()}
+          className="mt-8 inline-flex items-center gap-2 rounded-full bg-ink px-7 py-3.5 text-sm font-semibold text-cream transition-colors hover:bg-black"
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -90,12 +190,25 @@ export default function CartPage() {
         </p>
       </header>
 
+      {error && items.length > 0 && (
+        <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-line bg-cream/70 px-4 py-3 text-sm text-clay sm:flex-row sm:items-center sm:justify-between">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => void refreshCart()}
+            className="inline-flex items-center gap-2 self-start rounded-full bg-white px-4 py-2 font-medium text-ink transition-colors hover:bg-sand sm:self-auto"
+          >
+            Retry sync
+          </button>
+        </div>
+      )}
+
       <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_380px] lg:items-start">
         {/* Items */}
         <ul className="space-y-4">
-          {items.map(({ product, quantity }) => (
+          {items.map(({ id, product, quantity }) => (
             <li
-              key={product.id}
+              key={id}
               className="flex gap-4 rounded-2xl border border-line bg-white p-4 sm:gap-5 sm:p-5"
             >
               <Link
@@ -126,7 +239,7 @@ export default function CartPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => removeFromCart(product.id)}
+                    onClick={() => void removeFromCart(id)}
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-clay transition-colors hover:bg-cream hover:text-ink"
                     aria-label={`Remove ${product.name} from cart`}
                   >
@@ -137,7 +250,7 @@ export default function CartPage() {
                   <QuantitySelector
                     compact
                     value={quantity}
-                    onChange={(value) => updateQuantity(product.id, value)}
+                    onChange={(value) => void updateQuantity(id, value)}
                   />
                   <span className="font-semibold">
                     {formatPrice(product.price * quantity)}
@@ -162,6 +275,14 @@ export default function CartPage() {
                 {shipping === 0 ? "Free" : formatPrice(shipping)}
               </dd>
             </div>
+            {discount > 0 && (
+              <div className="flex justify-between">
+                <dt className="text-clay">Coupon discount</dt>
+                <dd className="font-semibold text-ink">
+                  -{formatPrice(discount)}
+                </dd>
+              </div>
+            )}
             {remaining > 0 && (
               <div className="rounded-xl border border-line bg-white p-3 text-xs leading-relaxed text-clay">
                 Add{" "}
@@ -179,6 +300,46 @@ export default function CartPage() {
                 </div>
               </div>
             )}
+            <div className="rounded-xl border border-line bg-white p-4">
+              <div className="flex items-center gap-2">
+                <TicketPercent size={16} className="text-clay" />
+                <h3 className="text-sm font-semibold">Apply coupon</h3>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <input
+                  type="text"
+                  value={couponInput}
+                  onChange={(event) => setCouponInput(event.target.value)}
+                  placeholder="Enter code"
+                  className="h-11 flex-1 rounded-full border border-line bg-cream/40 px-4 text-sm outline-none transition focus:border-ink focus:bg-white"
+                />
+                <button
+                  type="button"
+                  onClick={handleApplyCoupon}
+                  className="h-11 rounded-full bg-ink px-4 text-sm font-semibold text-cream transition-colors hover:bg-black"
+                >
+                  Apply
+                </button>
+              </div>
+              {couponMessage && (
+                <p className="mt-2 text-xs text-clay">{couponMessage}</p>
+              )}
+              {appliedCoupon && (
+                <div className="mt-3 flex items-center justify-between rounded-full bg-cream px-4 py-2 text-xs font-semibold text-ink">
+                  <span>
+                    {appliedCoupon} · {COUPONS[appliedCoupon].label}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={removeCoupon}
+                    className="inline-flex items-center gap-1 text-clay transition-colors hover:text-ink"
+                  >
+                    <X size={13} />
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
             <div className="flex items-baseline justify-between border-t border-line pt-3">
               <dt className="text-base font-semibold">Total</dt>
               <dd className="font-display text-2xl font-semibold">
@@ -189,9 +350,10 @@ export default function CartPage() {
           <button
             type="button"
             onClick={handleCheckout}
-            className="group mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-ink py-3.5 text-sm font-semibold text-cream transition-all hover:bg-black hover:shadow-[0_12px_30px_-10px_rgba(29,26,22,0.5)]"
+            disabled={isCheckingOut}
+            className="group mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-ink py-3.5 text-sm font-semibold text-cream transition-all hover:bg-black hover:shadow-[0_12px_30px_-10px_rgba(29,26,22,0.5)] disabled:cursor-not-allowed disabled:bg-ink/80"
           >
-            Checkout
+            {isCheckingOut ? "Processing..." : "Checkout"}
             <ArrowRight
               size={15}
               className="transition-transform group-hover:translate-x-0.5"

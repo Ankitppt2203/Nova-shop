@@ -51,8 +51,12 @@ function ProductDetailsContent({ id }: { id: string }) {
     (item) => item.category === product.category && item.id !== product.id
   ).slice(0, 4);
 
-  const handleAdd = () => {
-    addToCart(product, quantity);
+  const handleAdd = async () => {
+    const success = await addToCart(product, quantity);
+    if (!success) {
+      return;
+    }
+
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1600);
   };
@@ -123,13 +127,38 @@ function ProductDetailsContent({ id }: { id: string }) {
             {product.description}
           </p>
 
+          {product.specifications && product.specifications.length > 0 && (
+            <section className="mt-8 rounded-2xl border border-line bg-white p-5">
+              <h2 className="font-display text-lg font-semibold">
+                Product Specifications
+              </h2>
+              <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+                {product.specifications.map((spec) => (
+                  <div
+                    key={spec.label}
+                    className="rounded-xl border border-line bg-cream/40 px-4 py-3"
+                  >
+                    <dt className="text-xs font-semibold uppercase tracking-wider text-clay">
+                      {spec.label}
+                    </dt>
+                    <dd className="mt-1 text-sm font-medium text-ink">
+                      {spec.value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
+
           <div className="mt-8 border-t border-line pt-8">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-              <QuantitySelector value={quantity} onChange={setQuantity} />
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+              <div className="w-full lg:w-auto">
+                <QuantitySelector value={quantity} onChange={setQuantity} />
+              </div>
               <button
                 type="button"
                 onClick={handleAdd}
-                className={`flex h-12 flex-1 items-center justify-center gap-2 rounded-full text-sm font-semibold text-cream transition-all sm:flex-none sm:px-12 ${
+                className={`flex h-12 w-full items-center justify-center gap-2 rounded-full text-sm font-semibold text-cream transition-all lg:flex-1 lg:px-12 ${
                   added
                     ? "bg-ink/85"
                     : "bg-ink hover:bg-black hover:shadow-[0_12px_30px_-10px_rgba(29,26,22,0.5)] active:scale-[0.98]"
@@ -147,7 +176,7 @@ function ProductDetailsContent({ id }: { id: string }) {
                 type="button"
                 onClick={handleWishlist}
                 aria-pressed={saved}
-                className={`flex h-12 items-center justify-center gap-2 rounded-full border px-5 text-sm font-semibold transition-all sm:flex-none ${
+                className={`flex h-12 w-full items-center justify-center gap-2 rounded-full border px-5 text-sm font-semibold transition-all lg:w-auto lg:flex-none ${
                   saved
                     ? "border-ink bg-ink text-cream"
                     : "border-line bg-white text-ink hover:border-ink/30 hover:bg-cream"

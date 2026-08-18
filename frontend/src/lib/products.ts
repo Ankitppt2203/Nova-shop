@@ -1,5 +1,10 @@
 export type Category = "Home & Living" | "Accessories" | "Tech" | "Wellness";
 
+export interface ProductSpecification {
+  label: string;
+  value: string;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -10,6 +15,7 @@ export interface Product {
   reviews: number;
   description: string;
   image: string;
+  specifications?: ProductSpecification[];
   featured?: boolean;
   tag?: "Bestseller" | "New";
 }
@@ -43,6 +49,11 @@ export const PRODUCTS: Product[] = [
     description:
       "Hand-thrown from matte stoneware with a soft sand glaze, the Aurelia vase brings quiet sculptural warmth to shelves and tables. Each piece is finished by hand, so no two are exactly alike.",
     image: "/images/products/aurelia-vase.jpg",
+    specifications: [
+      { label: "Material", value: "Matte stoneware" },
+      { label: "Height", value: "28 cm" },
+      { label: "Finish", value: "Hand-glazed sand" },
+    ],
     featured: true,
     tag: "Bestseller",
   },
@@ -54,8 +65,13 @@ export const PRODUCTS: Product[] = [
     rating: 4.9,
     reviews: 168,
     description:
-      "Woven from 100% European flax, this generously sized throw softens with every wash. Breathable in summer and layering-warm in winter — the kind of piece your home reaches for daily.",
+      "Woven from 100% European flax, this generously sized throw softens with every wash. Breathable in summer and layering-warm in winter - the kind of piece your home reaches for daily.",
     image: "/images/products/linen-throw.jpg",
+    specifications: [
+      { label: "Material", value: "100% European flax" },
+      { label: "Size", value: "130 x 170 cm" },
+      { label: "Care", value: "Machine wash cold" },
+    ],
   },
   {
     id: "halo-lamp",
@@ -67,6 +83,11 @@ export const PRODUCTS: Product[] = [
     description:
       "A soft dome of warm light wrapped in brushed metal. The Halo dims smoothly from reading-bright to a low evening glow, with a discreet touch control on its base.",
     image: "/images/products/halo-lamp.jpg",
+    specifications: [
+      { label: "Material", value: "Brushed aluminum" },
+      { label: "Bulb", value: "Included warm LED" },
+      { label: "Control", value: "Touch dimmer" },
+    ],
     tag: "New",
   },
   {
@@ -79,6 +100,11 @@ export const PRODUCTS: Product[] = [
     description:
       "Cut from full-grain vegetable-tanned leather, the Atlas tote develops a rich patina over time. Fits a 14-inch laptop, with an interior zip pocket and reinforced handles.",
     image: "/images/products/atlas-tote.jpg",
+    specifications: [
+      { label: "Material", value: "Full-grain leather" },
+      { label: "Laptop fit", value: "Up to 14 inches" },
+      { label: "Pocket", value: "1 interior zip pocket" },
+    ],
     featured: true,
   },
   {
@@ -92,6 +118,11 @@ export const PRODUCTS: Product[] = [
     description:
       "Studio-tuned sound, adaptive noise cancellation and 40 hours of battery. Plush memory-foam ear cushions keep long listening sessions comfortable.",
     image: "/images/products/pulse-headphones.jpg",
+    specifications: [
+      { label: "Battery", value: "Up to 40 hours" },
+      { label: "Noise cancellation", value: "Adaptive ANC" },
+      { label: "Charging", value: "USB-C fast charge" },
+    ],
     featured: true,
     tag: "Bestseller",
   },
@@ -105,6 +136,11 @@ export const PRODUCTS: Product[] = [
     description:
       "Track workouts, sleep and notifications from a bright always-on display. A week of battery life in a case that looks more jewelry than gadget.",
     image: "/images/products/nova-watch.jpg",
+    specifications: [
+      { label: "Battery", value: "Up to 7 days" },
+      { label: "Display", value: "Always-on AMOLED" },
+      { label: "Tracking", value: "Heart rate + sleep" },
+    ],
     tag: "New",
   },
   {
@@ -115,8 +151,13 @@ export const PRODUCTS: Product[] = [
     rating: 4.8,
     reviews: 287,
     description:
-      "Three of our most loved scents — Cedar & Amber, Fig Leaf, and Sea Salt — poured into reusable glass vessels with 45 hours of burn time each.",
+      "Three of our most loved scents - Cedar & Amber, Fig Leaf, and Sea Salt - poured into reusable glass vessels with 45 hours of burn time each.",
     image: "/images/products/ember-candles.jpg",
+    specifications: [
+      { label: "Set", value: "3 candles" },
+      { label: "Burn time", value: "45 hours each" },
+      { label: "Wax", value: "Soy blend" },
+    ],
   },
   {
     id: "botanica-serum",
@@ -126,8 +167,13 @@ export const PRODUCTS: Product[] = [
     rating: 4.7,
     reviews: 431,
     description:
-      "A lightweight daily serum with 10% vitamin C, hyaluronic acid and squalane. Brightens, plumps and absorbs in seconds — no residue, no fuss.",
+      "A lightweight daily serum with 10% vitamin C, hyaluronic acid and squalane. Brightens, plumps and absorbs in seconds - no residue, no fuss.",
     image: "/images/products/botanica-serum.jpg",
+    specifications: [
+      { label: "Actives", value: "10% vitamin C" },
+      { label: "Texture", value: "Lightweight serum" },
+      { label: "Skin type", value: "All skin types" },
+    ],
     featured: true,
     tag: "New",
   },
@@ -141,6 +187,11 @@ export const PRODUCTS: Product[] = [
     description:
       "Hand-polished acetate frames with scratch-resistant, UV400 polarized lenses. Classic proportions that suit every face shape.",
     image: "/images/products/solstice-shades.jpg",
+    specifications: [
+      { label: "Frame", value: "Hand-polished acetate" },
+      { label: "Lenses", value: "UV400 polarized" },
+      { label: "Protection", value: "Scratch-resistant" },
+    ],
   },
   {
     id: "jute-basket",
@@ -152,6 +203,11 @@ export const PRODUCTS: Product[] = [
     description:
       "Handwoven from natural jute with sturdy cotton handles. Beautiful with blankets by the sofa, or corralled as storage anywhere life accumulates.",
     image: "/images/products/jute-basket.jpg",
+    specifications: [
+      { label: "Material", value: "Natural jute" },
+      { label: "Handles", value: "Cotton wrapped" },
+      { label: "Use", value: "Storage basket" },
+    ],
   },
   {
     id: "orbit-speaker",
@@ -161,8 +217,13 @@ export const PRODUCTS: Product[] = [
     rating: 4.7,
     reviews: 689,
     description:
-      "Room-filling 360° sound in a palm-sized fabric body. Twelve hours of playtime, IPX5 water resistance and one-touch pairing.",
+      "Room-filling 360 degree sound in a palm-sized fabric body. Twelve hours of playtime, IPX5 water resistance and one-touch pairing.",
     image: "/images/products/orbit-speaker.jpg",
+    specifications: [
+      { label: "Battery", value: "Up to 12 hours" },
+      { label: "Sound", value: "360 degree audio" },
+      { label: "Water resistance", value: "IPX5" },
+    ],
   },
   {
     id: "meridian-watch",
@@ -174,6 +235,11 @@ export const PRODUCTS: Product[] = [
     description:
       "A slim 38mm case, sapphire crystal and Japanese quartz movement, finished with a quick-release leather strap. Understated, precise, everyday.",
     image: "/images/products/meridian-watch.jpg",
+    specifications: [
+      { label: "Case", value: "38 mm stainless steel" },
+      { label: "Crystal", value: "Sapphire" },
+      { label: "Movement", value: "Japanese quartz" },
+    ],
   },
 ];
 
@@ -202,7 +268,7 @@ export const CATEGORY_META: CategoryMeta[] = [
   {
     name: "Wellness",
     image: "/images/categories/wellness.jpg",
-    blurb: "Small rituals — candles, skincare and calm.",
+    blurb: "Small rituals - candles, skincare and calm.",
   },
 ];
 
