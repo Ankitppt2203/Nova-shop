@@ -63,23 +63,13 @@ async function requestJson<T>(
   path: string,
   init: RequestInit = {}
 ): Promise<T> {
-  let response: Response;
-
-  try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
-      ...init,
-      headers: {
-        "Content-Type": "application/json",
-        ...(init.headers ?? {}),
-      },
-    });
-  } catch (error) {
-    throw new Error(
-      error instanceof Error && error.message
-        ? "Cart service is unavailable right now. Please make sure the backend server is running and try again."
-        : "Unable to reach the cart service right now. Please try again in a moment."
-    );
-  }
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init.headers ?? {}),
+    },
+  });
 
   let data: unknown = null;
   try {
@@ -95,13 +85,9 @@ async function requestJson<T>(
       "message" in data &&
       typeof (data as { message?: unknown }).message === "string"
         ? (data as { message: string }).message
-        : "";
+        : `Request failed with status ${response.status}`;
 
-    throw new Error(
-      message
-        ? `Request failed with status ${response.status}: ${message}`
-        : `Request failed with status ${response.status}`
-    );
+    throw new Error(message);
   }
 
   return data as T;

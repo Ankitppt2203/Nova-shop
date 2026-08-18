@@ -10,17 +10,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.use("/api/cart", (req, res, next) => {
-  if (mongoose.connection.readyState === 1) {
-    return next();
-  }
-
-  res.status(500).json({
-    message:
-      "Cart service is temporarily unavailable while the database is connecting. Please try again in a moment.",
-  });
-});
-
 app.use("/api/cart", cartRoutes);
 
 app.get("/", (req, res) => {
